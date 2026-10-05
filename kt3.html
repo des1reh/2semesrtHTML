@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Интерактивная Неоновая 3D Сцена</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #050510; /* Очень темный фон для эффекта неона */
+            font-family: 'Inter', sans-serif;
+        }
+        
+        #canvas-container {
+            width: 100vw;
+            height: 100vh;
+            display: block;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+        }
+
+        /* Стили для экрана загрузки */
+        #loading-overlay {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(5, 5, 16, 0.85);
+            backdrop-filter: blur(10px);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 10;
+            color: white;
+            transition: opacity 0.8s ease, visibility 0.8s ease;
+        }
+
+        .spinner {
+            width: 60px;
+            height: 60px;
+            border: 4px solid rgba(0, 255, 255, 0.1);
+            border-top: 4px solid #00ffff;
+            border-right: 4px solid #ff00ff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 20px;
+            box-shadow: 0 0 20px rgba(0, 255, 255, 0.4);
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .loading-text {
+            font-size: 1.25rem;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+        }
+
+        .hidden-overlay {
+            opacity: 0;
+            visibility: hidden;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="loading-overlay">
+        <div class="spinner"></div>
+        <div class="loading-text" id="loading-msg">Загрузка модели...</div>
+    </div>
+    
+    <div id="canvas-container"></div>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+        
+        // Импорты для постобработки (эффект свечения - Bloom)
+        import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+        import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+        import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+
+        const container = document.getElementById('canvas-container');
+        const loadingOverlay = document.getElementById('loading-overlay');
+        const loadingMsg = document.getElementById('loading-msg');
+
+        const scene = new THREE.Scene();
+        scene.fog = new THREE.FogExp2(0x050510, 0.03); // Легкий туман на фоне
+
+        const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(0, 4, 15);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: "high-performance" });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); // Оптимизация для ретины
+        renderer.toneMapping = THREE.ReinhardToneMapping;
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        container.appendChild(renderer.domElement);
+
+        const renderScene = new RenderPass(scene, camera);
+        
+        const bloomPass = new UnrealBloomPass(
+            new THREE.Vector2(window.innerWidth, window.innerHeight),
+            1.5, // Интенсивность (strength)
+            0.5, // Радиус свечения (radius)
+            0.1  // Порог (threshold) - определяет, насколько ярким должен быть пиксель, чтобы начать светиться
+        );
+
+        const composer = new EffectComposer(renderer);
+        composer.addPass(renderScene);
+        composer.addPass(bloomPass);
+
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        controls.autoRotate = true; 
+        controls.autoRotateSpeed = 0.8;
+        controls.maxDistance = 30; // Ограничение отдаления камеры
+        controls.minDistance = 5;
+
+        const ambientLight = new THREE.AmbientLight(0x202040, 1.5);
+        scene.add(ambientLight);
+
+        const dirLight1 = new THREE.DirectionalLight(0x00ffff, 2);
+        dirLight1.position.set(10, 10, 10);
+        dirLight1.castShadow = true;
+        scene.add(dirLight1);
+
+        const dirLight2 = new THREE.DirectionalLight(0xff00ff, 2);
+        dirLight2.position.set(-10, 10, -10);
+        scene.add(dirLight2);
+
+        const particlesCount = 3000;
+        const particlesGeo = new THREE.BufferGeometry();
+        const particlesPos = new Float32Array(particlesCount * 3);
+        const particlesColor = new Float32Array(particlesCount * 3);
+
+        for (let i = 0; i < particlesCount; i++) {
+            // Распределение частиц в большой сфере
+            const r = 25 * Math.cbrt(Math.random());
+            const theta = Math.random() * 2 * Math.PI;
+            const phi = Math.acos(2 * Math.random() - 1);
+            
+            particlesPos[i * 3] = r * Math.sin(phi) * Math.cos(theta);
+            particlesPos[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta);
+            particlesPos[i * 3 + 2] = r * Math.cos(phi);
+
+            // Цвета от синего до розового
+            const color = new THREE.Color();
+            color.setHSL(Math.random() * 0.2 + 0.55, 0.8, 0.6);
+            particlesColor[i * 3] = color.r;
+            particlesColor[i * 3 + 1] = color.g;
+            particlesColor[i * 3 + 2] = color.b;
+        }
+
+        particlesGeo.setAttribute('position', new THREE.BufferAttribute(particlesPos, 3));
+        particlesGeo.setAttribute('color', new THREE.BufferAttribute(particlesColor, 3));
+
+        const particlesMat = new THREE.PointsMaterial({
+            size: 0.08,
+            vertexColors: true,
+            blending: THREE.AdditiveBlending,
+            transparent: true,
+            opacity: 0.6,
+            depthWrite: false
+        });
+
+        const particleSystem = new THREE.Points(particlesGeo, particlesMat);
+        scene.add(particleSystem);
+
+        const shapes = [];
+        const shapesConfigs = [
+            { geo: new THREE.TorusKnotGeometry(0.5, 0.15, 100, 16), color: 0xff0055 },
+            { geo: new THREE.IcosahedronGeometry(0.7, 0), color: 0x00ffcc },
+            { geo: new THREE.ConeGeometry(0.5, 1.2, 32), color: 0xffaa00 },
+            { geo: new THREE.CylinderGeometry(0.4, 0.4, 1.5, 32), color: 0xaa00ff },
+            { geo: new THREE.TorusGeometry(0.6, 0.2, 16, 100), color: 0x0055ff },
+            { geo: new THREE.OctahedronGeometry(0.7, 0), color: 0x00ff00 }
+        ];
+
+        const orbitRadius = 6; // Радиус кольца вокруг центральной модели
+
+        shapesConfigs.forEach((config, index) => {
+            const material = new THREE.MeshStandardMaterial({
+                color: 0x111111,
+                emissive: config.color,
+                emissiveIntensity: 2.0, // Яркость свечения для Bloom
+                roughness: 0.4,
+                metalness: 0.8
+            });
+
+            const mesh = new THREE.Mesh(config.geo, material);
+            mesh.castShadow = true;
+            mesh.receiveShadow = true;
+
+            // Расчет позиции по кругу
+            const angle = (index / shapesConfigs.length) * Math.PI * 2;
+            const x = Math.cos(angle) * orbitRadius;
+            const z = Math.sin(angle) * orbitRadius;
+            
+            // Задаем базовую высоту с небольшим случайным отклонением
+            const baseY = (Math.random() - 0.5) * 3; 
+            
+            mesh.position.set(x, baseY, z);
+            scene.add(mesh);
+
+            // ВАЖНОЕ ИСПРАВЛЕНИЕ: Сохраняем базовую высоту (baseY) в userData
+            // Это предотвратит бесконечный улет фигур вверх. Мы будем считать позицию y
+            // как baseY + смещение синуса, а не прибавлять к текущему y.
+            mesh.userData = {
+                baseY: baseY,
+                rotSpeedX: (Math.random() - 0.5) * 0.02,
+                rotSpeedY: (Math.random() - 0.5) * 0.02,
+                hoverSpeed: Math.random() * 1.5 + 0.5, // Скорость покачивания
+                hoverAmplitude: Math.random() * 0.8 + 0.3, // Размах покачивания
+                hoverOffset: Math.random() * Math.PI * 2 // Смещение фазы
+            };
+
+            shapes.push(mesh);
+        });
+
+        const loader = new GLTFLoader();
+        const modelUrl = 'https://cdn.jsdelivr.net/gh/des1reh/2semesrtHTML@main/modelll.glb';
+        
+        let loadedModelGroup = new THREE.Group();
+        scene.add(loadedModelGroup);
+
+        loader.load(
+            modelUrl,
+            (gltf) => {
+                const model = gltf.scene;
+
+                // Нормализация масштаба и центрирование (через Box3)
+                const box = new THREE.Box3().setFromObject(model);
+                const size = box.getSize(new THREE.Vector3()).length();
+                
+                const targetSize = 5; // Идеальный размер для нашей сцены
+                const scale = targetSize / (size || 1);
+                model.scale.setScalar(scale);
+
+                // Вычисляем центр и смещаем модель так, чтобы ее ось вращения была точно по центру
+                const center = box.getCenter(new THREE.Vector3());
+                model.position.x = -center.x * scale;
+                model.position.y = -center.y * scale;
+                model.position.z = -center.z * scale;
+
+                // Включаем тени для модели
+                model.traverse((child) => {
+                    if (child.isMesh) {
+                        child.castShadow = true;
+                        child.receiveShadow = true;
+                        // Немного усиливаем отражения, если есть материал
+                        if (child.material) {
+                            child.material.envMapIntensity = 1.5;
+                        }
+                    }
+                });
+
+                // Добавляем модель в группу. Группу мы разместили в центре (0,0,0).
+                // Теперь при вращении группы модель будет вращаться идеально вокруг своей оси.
+                loadedModelGroup.add(model);
+
+                // Скрываем экран загрузки
+                loadingOverlay.classList.add('hidden-overlay');
+                setTimeout(() => loadingOverlay.style.display = 'none', 800);
+            },
+            (xhr) => {
+                if (xhr.total > 0) {
+                    const percent = Math.round((xhr.loaded / xhr.total) * 100);
+                    loadingMsg.innerText = `Загрузка: ${percent}%`;
+                }
+            },
+            (error) => {
+                console.error('Ошибка загрузки модели:', error);
+                loadingMsg.innerText = 'Ошибка загрузки модели';
+                loadingMsg.style.color = '#ff4444';
+            }
+        );
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            composer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        const clock = new THREE.Clock();
+
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            const time = clock.getElapsedTime();
+
+            // Анимация кастомной модели (медленное вращение и плавное покачивание)
+            if (loadedModelGroup) {
+                loadedModelGroup.rotation.y = Math.sin(time * 0.2) * 0.3; // Легкое покачивание влево-вправо
+                loadedModelGroup.position.y = Math.sin(time) * 0.3; // Центральная модель тоже слегка "дышит"
+            }
+
+            // Анимация дополнительных фигур
+            shapes.forEach((mesh) => {
+                // Вращение вокруг собственных осей
+                mesh.rotation.x += mesh.userData.rotSpeedX;
+                mesh.rotation.y += mesh.userData.rotSpeedY;
+
+                // ИСПРАВЛЕНИЕ: Абсолютный расчет позиции y
+                // Мы берем исходную базовую высоту (baseY) и прибавляем к ней значение синусоиды.
+                // Это гарантирует, что объект будет двигаться вверх-вниз в заданном диапазоне
+                // и никогда не улетит бесконечно вверх.
+                const hoverY = Math.sin(time * mesh.userData.hoverSpeed + mesh.userData.hoverOffset);
+                mesh.position.y = mesh.userData.baseY + (hoverY * mesh.userData.hoverAmplitude);
+            });
+
+            // Анимация системы частиц (медленное вращение всего космоса)
+            if (particleSystem) {
+                particleSystem.rotation.y = time * 0.02;
+                particleSystem.rotation.x = time * 0.01;
+            }
+
+            // Обновление контроллера камеры
+            controls.update();
+
+            // Рендер через композитор (чтобы работал эффект свечения Bloom)
+            composer.render();
+        }
+
+        // Запуск цикла
+        animate();
+    </script>
+</body>
+</html>
