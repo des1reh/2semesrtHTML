@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NVIDIA Store</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="light-theme">
+
+    <header>
+        <div class="header-container">
+            <h1>NVIDIA Store</h1>
+            <nav>
+                <button id="theme-btn">🌙 Темная тема</button>
+                <div>
+                    <span>🛒 Корзина:</span>
+                    <span id="cart-counter">0</span>
+                </div>
+            </nav>
+        </div>
+    </header>
+
+    <main>
+        <section class="hero">
+            <img src="https://images.unsplash.com/photo-1550745165-9bc0b252726f?auto=format&fit=crop&w=1200&q=80" alt="NVIDIA Фон" class="hero-bg">
+            <div class="hero-content">
+                <h2>Видеокарты NVIDIA GeForce RTX 40</h2>
+                <a href="#products" class="btn">Подробнее</a>
+            </div>
+        </section>
+
+        <section id="products" class="products">
+            <h2>Каталог видеокарт</h2>
+            <div class="grid">
+                
+                <div class="card">
+                    <img src="https://images.unsplash.com/photo-1587202372775-e229f172b9d7?auto=format&fit=crop&w=500&q=80" alt="RTX 4090">
+                    <h3>GeForce RTX 4090</h3>
+                    <p>199 990 ₽</p>
+                    <button class="buy-btn" onclick="buy()">Купить</button>
+                </div>
+
+                <div class="card">
+                    <img src="https://images.unsplash.com/photo-1591488320449-011701bb6704?auto=format&fit=crop&w=500&q=80" alt="RTX 4080">
+                    <h3>GeForce RTX 4080 Super</h3>
+                    <p>129 990 ₽</p>
+                    <button class="buy-btn" onclick="buy()">Купить</button>
+                </div>
+
+                <div class="card">
+                    <img src="https://images.unsplash.com/photo-1555680202-c86f0e12f086?auto=format&fit=crop&w=500&q=80" alt="RTX 4070">
+                    <h3>GeForce RTX 4070 Ti</h3>
+                    <p>89 990 ₽</p>
+                    <button class="buy-btn" onclick="buy()">Купить</button>
+                </div>
+
+            </div>
+        </section>
+
+        <section class="form-section">
+            <h2>Опрос покупателя</h2>
+            <form id="form">
+                <input type="text" id="name" placeholder="1. Ваше имя" required>
+                <input type="email" placeholder="2. Ваш Email" required>
+                <input type="text" placeholder="3. Для чего берете видеокарту?" required>
+                <input type="text" placeholder="4. Важен ли для вас DLSS 3?" required>
+                <textarea placeholder="5. Дополнительный комментарий"></textarea>
+                <button type="submit" class="buy-btn">Отправить</button>
+            </form>
+        </section>
+    </main>
+
+    <footer>
+        <p>&copy; 2026 NVIDIA Store</p>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+</html>
